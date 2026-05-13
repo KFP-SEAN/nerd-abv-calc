@@ -1,0 +1,154 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NERD Brewery - 알코올 도수 온도 환산기</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #e67e22;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+        }
+        .input-group {
+            margin-bottom: 1.2rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            border-color: var(--accent-color);
+        }
+        .result-box {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #fdf2e9;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px dashed var(--accent-color);
+        }
+        .result-label {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+        .result-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+        .footer {
+            margin-top: 1.5rem;
+            font-size: 0.8rem;
+            color: #95a5a6;
+            text-align: center;
+            line-height: 1.4;
+        }
+        .info-tag {
+            display: inline-block;
+            background: #eee;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>알코올 도수 환산 (15°C 기준)</h1>
+    <div style="text-align: center;"><span class="info-tag">NERD Brewery Brewery OPS</span></div>
+    
+    <div class="input-group">
+        <label for="temp">측정 온도 (°C)</label>
+        <input type="number" id="temp" step="0.1" placeholder="예: 20.5" value="15.0">
+    </div>
+    
+    <div class="input-group">
+        <label for="measuredAbv">측정 도수 (% vol)</label>
+        <input type="number" id="measuredAbv" step="0.1" placeholder="예: 11.2">
+    </div>
+
+    <div class="result-box">
+        <div class="result-label">15°C 환산 도수</div>
+        <div id="result" class="result-value">-</div>
+    </div>
+
+    <div class="footer">
+        주류분석규정 별표 2 기준 온도 보정<br>
+        15°C 기준 도수 = 측정도수 + [0.047 * (측정온도 - 15)]<br>
+        (측정 범위: 15~27°C 권장)
+    </div>
+</div>
+
+<script>
+    const tempInput = document.getElementById('temp');
+    const abvInput = document.getElementById('measuredAbv');
+    const resultDisplay = document.getElementById('result');
+
+    function calculate() {
+        const t = parseFloat(tempInput.value);
+        const a = parseFloat(abvInput.value);
+
+        if (isNaN(t) || isNaN(a)) {
+            resultDisplay.innerText = "-";
+            return;
+        }
+
+        // 보정 공식: 15도 기준 도수 = 측정도수 + (측정온도 - 15) * 0.047
+        // 증류주(고도주) 온도 보정 상수는 약 0.047/도 (15도 기준)
+        // 온도가 높으면 부피 팽창으로 인해 측정 도수가 실제보다 낮게 나오므로 더해줘야 함.
+        let correctedAbv = a + (0.047 * (t - 15));
+        
+        resultDisplay.innerText = correctedAbv.toFixed(2) + "%";
+    }
+
+    tempInput.addEventListener('input', calculate);
+    abvInput.addEventListener('input', calculate);
+</script>
+
+</body>
+</html>
