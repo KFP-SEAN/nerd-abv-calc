@@ -118,9 +118,9 @@
     </div>
 
     <div class="footer">
-        주류분석규정 별표 2 기준 온도 보정<br>
-        15°C 기준 도수 = 측정도수 + [0.047 * (측정온도 - 15)]<br>
-        (측정 범위: 15~27°C 권장)
+        주류분석규정 [별표 2] 알코올분 온도 환산표 근거<br>
+        15°C 기준 도수 = 측정도수 - 보정치<br>
+        (온도가 높을수록 실제 도수는 측정치보다 낮아짐)
     </div>
 </div>
 
@@ -129,6 +129,11 @@
     const abvInput = document.getElementById('measuredAbv');
     const resultDisplay = document.getElementById('result');
 
+    // 주류분석규정 [별표 2] 기반 보정 계수 (1도당 약 0.3~0.4도 변화)
+    // 도수가 높을수록(증류주) 보정폭이 커짐.
+    // 95도 부근: 20도에서 -1.1도 보정 (계수 0.22)
+    // 20~40도 부근: 20도에서 약 -1.7~-2.0도 보정 (계수 0.35~0.4)
+    // Cooper님의 '증류주' 환경(15~27도)에 최적화된 계수 0.38 적용
     function calculate() {
         const t = parseFloat(tempInput.value);
         const a = parseFloat(abvInput.value);
@@ -138,12 +143,16 @@
             return;
         }
 
-        // 보정 공식: 15도 기준 도수 = 측정도수 + (측정온도 - 15) * 0.047
-        // 증류주(고도주) 온도 보정 상수는 약 0.047/도 (15도 기준)
-        // 온도가 높으면 부피 팽창으로 인해 측정 도수가 실제보다 낮게 나오므로 더해줘야 함.
-        let correctedAbv = a + (0.047 * (t - 15));
+        // 보정 공식: 15도 실도수 = 측정치 - (측정온도 - 15) * 보정계수
+        // 계수 설명: 온도가 5도 오를 때(15->20) 도수는 약 1.9도 낮아짐 (0.38 * 5 = 1.9)
+        let coefficient = 0.38; 
         
-        resultDisplay.innerText = correctedAbv.toFixed(2) + "%";
+        // 고도주(90도 이상)일 경우 계수가 작아지는 특성 반영 (옵션)
+        if (a > 80) coefficient = 0.25;
+
+        let correctedAbv = a - (coefficient * (t - 15));
+        
+        resultDisplay.innerText = correctedAbv.toFixed(1) + "%";
     }
 
     tempInput.addEventListener('input', calculate);
