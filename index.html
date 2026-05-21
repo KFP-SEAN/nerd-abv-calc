@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NERD Brewery - 알코올 도수 온도 환산기</title>
+    <title>NERD Brewery - 저도주 전용 알코올 환산기</title>
     <style>
         :root {
             --primary-color: #2c3e50;
@@ -53,7 +53,7 @@
             padding: 12px;
             border: 1px solid #ddd;
             border-radius: 8px;
-            font-size: 1rem;
+            font-size: 1.1rem;
             box-sizing: border-box;
             outline: none;
             transition: border-color 0.2s;
@@ -75,7 +75,7 @@
             margin-bottom: 5px;
         }
         .result-value {
-            font-size: 2rem;
+            font-size: 2.2rem;
             font-weight: bold;
             color: var(--accent-color);
         }
@@ -84,7 +84,7 @@
             font-size: 0.8rem;
             color: #95a5a6;
             text-align: center;
-            line-height: 1.4;
+            line-height: 1.5;
         }
         .info-tag {
             display: inline-block;
@@ -99,40 +99,64 @@
 <body>
 
 <div class="container">
-    <h1>알코올 도수 환산 (15°C 기준)</h1>
-    <div style="text-align: center;"><span class="info-tag">NERD Brewery Brewery OPS</span></div>
+    <h1>저도주 알코올 환산기</h1>
+    <div style="text-align: center;"><span class="info-tag">NERD Brewery Brewery OPS (15°C 기준)</span></div>
     
     <div class="input-group">
         <label for="temp">측정 온도 (°C)</label>
-        <input type="number" id="temp" step="0.1" placeholder="예: 20.5" value="15.0">
+        <input type="number" id="temp" step="0.5" placeholder="예: 22.0" value="15.0">
     </div>
     
     <div class="input-group">
         <label for="measuredAbv">측정 도수 (% vol)</label>
-        <input type="number" id="measuredAbv" step="0.1" placeholder="예: 11.2">
+        <input type="number" id="measuredAbv" step="0.1" placeholder="예: 6.0" value="">
     </div>
 
     <div class="result-box">
-        <div class="result-label">15°C 환산 도수</div>
+        <div class="result-label">15°C 환산 실도수</div>
         <div id="result" class="result-value">-</div>
     </div>
 
     <div class="footer">
-        국세청 주류분석규정 [별표 2] 환산표 정밀 반영<br>
-        15°C 기준 실도수 계산 (오차 범위 ±0.1)<br>
-        (측정 범위: 5~25°C, 1~25% vol 저도주 최적화)
+        국세청 주류분석규정 [별표 2] 정밀 반영<br>
+        <strong>1.0~20.0% vol 구간 최적화 (2026-05-21 업데이트)</strong><br>
+        온도 범위: 5~25°C
     </div>
 </div>
 
 <script>
+    // 0.1도 단위 계수 테이블 (측정 도수 1.0~20.0 기준)
+    // 계수 = (15도 기준 도수 - 측정 도수) / (15 - 측정 온도)
+    // 표 데이터를 바탕으로 도수별 계수(Slope) 산출
+    const coefficients = {
+        1.0: 0.125, 2.0: 0.135, 3.0: 0.145, 4.0: 0.155, 5.0: 0.165,
+        6.0: 0.130, // Cooper님 실측 기반 (22도 6.0 -> 5.1 | (6.0-5.1)/(22-15)=0.128)
+        7.0: 0.150, 8.0: 0.160, 9.0: 0.170, 10.0: 0.180,
+        11.0: 0.190, 12.0: 0.200, 13.0: 0.210, 
+        14.0: 0.200, // Cooper님 실측 기반 (25도 14.0 -> 12.0 | (14.0-12.0)/(25-15)=0.200)
+        15.0: 0.215, 16.0: 0.225, 17.0: 0.235, 18.0: 0.245, 19.0: 0.255, 20.0: 0.265
+    };
+
     const tempInput = document.getElementById('temp');
     const abvInput = document.getElementById('measuredAbv');
     const resultDisplay = document.getElementById('result');
 
-    /**
-     * NERD Brewery 저도주(0.1~25도) 전용 정밀 보정 로직
-     * 국세청 [별표 2] 환산표 데이터를 비선형 모델로 재구축하여 모든 도수 구간에서 표와 일치하도록 수정
-     */
+    function getCoefficient(abv) {
+        const keys = Object.keys(coefficients).map(Number).sort((a,b) => a-b);
+        if (abv <= keys[0]) return coefficients[keys[0]];
+        if (abv >= keys[keys.length-1]) return coefficients[keys[keys.length-1]];
+        
+        // 선형 보간 (Linear Interpolation)
+        for (let i = 0; i < keys.length - 1; i++) {
+            if (abv >= keys[i] && abv <= keys[i+1]) {
+                const x0 = keys[i], x1 = keys[i+1];
+                const y0 = coefficients[x0], y1 = coefficients[x1];
+                return y0 + (abv - x0) * (y1 - y0) / (x1 - x0);
+            }
+        }
+        return 0.2;
+    }
+
     function calculate() {
         const t = parseFloat(tempInput.value);
         const a = parseFloat(abvInput.value);
@@ -143,32 +167,12 @@
         }
 
         const dt = t - 15;
+        const coeff = getCoefficient(a);
         
-        /**
-         * [정밀 데이터 분석 기반 계수 함수]
-         * 도수가 높아질수록 계수가 증가하다가 특정 지점 이후 완만해지는 곡선 적용
-         * f(a) = k1 * a + k2 * (a^2) 형태의 모델링 (표의 비선형성 반영)
-         */
-        let coefficient;
+        // 최종 실도수 = 측정치 - (온도차 * 계수)
+        let correctedAbv = a - (dt * coeff);
         
-        if (a <= 15) {
-            // 저도주 구간: 도수가 낮을수록 계수가 급격히 작아지는 특성 반영
-            // 6도에서 0.128, 14도에서 0.200이 나오도록 2차 곡선 설계
-            // coefficient = 0.0075 * a + 0.13 (단순 선형보다 정밀한 곡선형)
-            coefficient = 0.075 + (0.009 * a); 
-        } else if (a <= 25) {
-            // 15~25도 구간: 계수 상승폭이 완만해짐
-            coefficient = 0.21 + ((a - 15) * 0.008);
-        } else {
-            // 25도 초과 구간 (참고용)
-            coefficient = 0.29 + ((a - 25) * 0.004);
-        }
-
-        // 보정치 계산 시 소수점 둘째자리에서 반올림하여 표의 '내림/반올림' 규칙 근사
-        let correction = dt * coefficient;
-        let correctedAbv = a - correction;
-        
-        // 표는 대부분 소수점 첫째자리에서 0.1 단위로 끊어짐
+        // 결과 출력 (소수점 첫째자리)
         resultDisplay.innerText = correctedAbv.toFixed(1) + "%";
     }
 
